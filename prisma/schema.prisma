@@ -1,0 +1,97 @@
+// Desubscribe data model — local SQLite.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// A connected mailbox (IMAP read + SMTP send). Credentials stored encrypted.
+model EmailAccount {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  provider      String    @default("imap") // imap | gmail | outlook
+  imapHost      String
+  imapPort      Int       @default(993)
+  smtpHost      String
+  smtpPort      Int       @default(465)
+  secretCipher  String // AES-256-GCM encrypted app-password (JSON blob)
+  lastSyncedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  charges       ChargeEvent[]
+}
+
+// A Plaid item = one financial institution login. Access token stored encrypted.
+model BankItem {
+  id            String    @id @default(cuid())
+  institution   String
+  tokenCipher   String // AES-256-GCM encrypted Plaid access_token
+  lastSyncedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  charges       ChargeEvent[]
+}
+
+// The unified, deduplicated thing-you-pay-for.
+model Subscription {
+  id           String        @id @default(cuid())
+  name         String
+  merchant     String? // normalized merchant key used for dedupe
+  category     String        @default("Other")
+  amount       Float? // per-cycle amount
+  currency     String        @default("USD")
+  cycle        String        @default("monthly") // weekly|monthly|quarterly|yearly|unknown
+  nextDueAt    DateTime?
+  firstSeenAt  DateTime?
+  lastChargeAt DateTime?
+  status       String        @default("active") // active|cancelling|cancelled|paused
+  source       String        @default("email") // email|bank|manual|merged
+  confidence   Float         @default(0.6) // 0..1
+  protected    Boolean       @default(false) // never auto-cancel when true
+  isTrial      Boolean       @default(false)
+  cancelUrl    String?
+  unsubData    String? // JSON: List-Unsubscribe info captured from email
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  charges      ChargeEvent[]
+  actions      ActionLog[]
+}
+
+// Evidence: an individual charge/receipt that backs a subscription.
+model ChargeEvent {
+  id             String        @id @default(cuid())
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  date           DateTime
+  amount         Float
+  currency       String        @default("USD")
+  source         String // email | plaid | manual
+  description    String?
+  emailAccountId String?
+  emailAccount   EmailAccount? @relation(fields: [emailAccountId], references: [id], onDelete: SetNull)
+  bankItemId     String?
+  bankItem       BankItem?     @relation(fields: [bankItemId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+}
+
+// Full audit trail of everything the AI did (full-auto safety).
+model ActionLog {
+  id             String        @id @default(cuid())
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  type           String // one_click | email_unsub | web_cancel | draft | sync
+  status         String // pending | success | failed | dry_run | skipped
+  detail         String? // human-readable summary
+  request        String? // JSON of what was attempted
+  response       String? // JSON / text of the result
+  screenshotPath String?
+  createdAt      DateTime      @default(now())
+}
+
+// Singleton-ish key/value settings (encrypted secrets + automation prefs).
+model Setting {
+  key   String @id
+  value String
+}
