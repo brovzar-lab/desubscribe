@@ -8,16 +8,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// A connected mailbox (IMAP read + SMTP send). Credentials stored encrypted.
+// A connected mailbox. authType=imap uses an app-password; authType=gmail_oauth
+// uses Google OAuth tokens. Credentials/tokens stored encrypted.
 model EmailAccount {
   id            String    @id @default(cuid())
   email         String    @unique
   provider      String    @default("imap") // imap | gmail | outlook
-  imapHost      String
+  authType      String    @default("imap") // imap | gmail_oauth
+  imapHost      String?
   imapPort      Int       @default(993)
-  smtpHost      String
+  smtpHost      String?
   smtpPort      Int       @default(465)
-  secretCipher  String // AES-256-GCM encrypted app-password (JSON blob)
+  secretCipher  String? // AES-256-GCM encrypted app-password (IMAP)
+  oauthCipher   String? // AES-256-GCM encrypted {refresh_token, access_token, expiry}
   lastSyncedAt  DateTime?
   createdAt     DateTime  @default(now())
   charges       ChargeEvent[]
@@ -50,9 +53,16 @@ model Subscription {
   confidence   Float         @default(0.6) // 0..1
   protected    Boolean       @default(false) // never auto-cancel when true
   isTrial      Boolean       @default(false)
+  trialEndsAt  DateTime?
   cancelUrl    String?
   unsubData    String? // JSON: List-Unsubscribe info captured from email
   notes        String?
+  tags         String? // comma-separated user tags
+  reviewNeeded Boolean       @default(false) // low-confidence: surface for review
+  previousAmount Float? // last known price before a change
+  priceChangedAt DateTime? // when we detected a price increase/decrease
+  cancelledAt  DateTime? // when it was cancelled (powers savings tracker)
+  lastReminderAt DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   charges      ChargeEvent[]

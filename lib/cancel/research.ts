@@ -1,4 +1,5 @@
 import { getClient, RESEARCH_MODEL, parseJson } from "../anthropic";
+import { lookupPlaybook } from "./playbooks";
 
 export interface CancelPlan {
   method: "web" | "email" | "phone" | "unknown";
@@ -7,11 +8,16 @@ export interface CancelPlan {
   phone?: string | null;
   steps: string[];
   notes?: string;
+  retentionTip?: string;
+  source?: "playbook" | "ai" | "generic";
 }
 
-// Look up how to cancel a given service. Uses Tavily (if configured) to gather
-// current cancellation pages, then Claude to distill concrete steps.
+// Look up how to cancel a given service. Tries a curated playbook first, then
+// Tavily web context distilled by Claude, then generic guidance.
 export async function researchCancellation(serviceName: string): Promise<CancelPlan> {
+  const playbook = lookupPlaybook(serviceName);
+  if (playbook) return { ...playbook, source: "playbook" };
+
   const context = await tavilySearch(`how to cancel ${serviceName} subscription cancellation page`);
   const client = await getClient();
   if (!client) {
@@ -22,6 +28,7 @@ export async function researchCancellation(serviceName: string): Promise<CancelP
         ? [`Open ${context.url}`, "Sign in", "Find Membership/Plan settings", "Cancel and confirm"]
         : [`Search "${serviceName} cancel subscription" and follow the official help page.`],
       notes: "No Claude key set — generic guidance.",
+      source: "generic",
     };
   }
 
@@ -39,12 +46,10 @@ Prefer the official cancellation URL. Steps must be concrete and ordered.`,
     ],
   });
   const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  return (
-    parseJson<CancelPlan>(text) ?? {
-      method: "unknown",
-      steps: [`Could not determine steps for ${serviceName}.`],
-    }
-  );
+  const ai = parseJson<CancelPlan>(text);
+  return ai
+    ? { ...ai, source: "ai" }
+    : { method: "unknown", steps: [`Could not determine steps for ${serviceName}.`], source: "generic" };
 }
 
 async function tavilySearch(query: string): Promise<{ text: string; url: string | null }> {

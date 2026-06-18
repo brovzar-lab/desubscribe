@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePlaidLink } from "react-plaid-link";
 
-interface Account { id: string; email: string; lastSyncedAt: string | null }
+interface Account { id: string; email: string; authType: string; lastSyncedAt: string | null }
 interface Bank { id: string; institution: string; lastSyncedAt: string | null }
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
   killSwitch: boolean;
   hasAnthropicKey: boolean;
   plaidReady: boolean;
+  googleReady: boolean;
 }
 
 export default function SettingsPanel(props: Props) {
@@ -74,14 +75,31 @@ export default function SettingsPanel(props: Props) {
         {props.accounts.length > 0 && (
           <ul className="text-sm text-muted">
             {props.accounts.map((a) => (
-              <li key={a.id}>• {a.email} {a.lastSyncedAt ? `(synced ${new Date(a.lastSyncedAt).toLocaleDateString()})` : "(not synced)"}</li>
+              <li key={a.id}>
+                • {a.email} <span className="pill bg-edge text-muted">{a.authType === "gmail_oauth" ? "Google OAuth" : "IMAP"}</span>{" "}
+                {a.lastSyncedAt ? `(synced ${new Date(a.lastSyncedAt).toLocaleDateString()})` : "(not synced)"}
+              </li>
             ))}
           </ul>
         )}
-        <AccountForm onSave={(b) => save("/api/accounts", b)} />
-        <p className="text-xs text-muted">
-          Use an app-password (Gmail: Account → Security → App passwords), not your normal login. IMAP/SMTP hosts are auto-filled for common providers.
-        </p>
+
+        <div className="rounded-xl border border-edge p-3">
+          <h3 className="mb-2 text-sm font-semibold">Connect with Google (recommended)</h3>
+          {props.googleReady ? (
+            <a className="btn-primary inline-block" href="/api/google/auth">Connect Gmail with Google</a>
+          ) : (
+            <p className="text-sm text-warn">Set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env to enable Google OAuth.</p>
+          )}
+          <p className="mt-1 text-xs text-muted">Reads receipts, sends cancellations, and powers Google Calendar reminders.</p>
+        </div>
+
+        <div className="rounded-xl border border-edge p-3">
+          <h3 className="mb-2 text-sm font-semibold">Or connect any mailbox via IMAP</h3>
+          <AccountForm onSave={(b) => save("/api/accounts", b)} />
+          <p className="mt-1 text-xs text-muted">
+            Use an app-password (not your normal login). IMAP/SMTP hosts auto-fill for Gmail/Outlook/Yahoo/iCloud.
+          </p>
+        </div>
       </section>
 
       {/* Bank */}

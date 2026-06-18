@@ -1,6 +1,7 @@
 import { prisma } from "../db";
 import { getAutomationLevel, isKillSwitchOn } from "../settings";
 import { credsFromAccount, sendMail } from "../email/imap";
+import { sendGmail } from "../email/gmail";
 import { oneClickUnsubscribe } from "../email/unsubscribe";
 import { researchCancellation } from "./research";
 import { webCancel } from "./webCancel";
@@ -60,10 +61,11 @@ export async function cancelSubscription(
     if (dryRun) {
       steps.push({ type: "email_unsub", status: "dry_run", detail: `Would email unsubscribe request to ${mailTarget}` });
     } else {
-      const creds = credsFromAccount(account);
-      const r = await sendMail(creds, mailTarget, "Unsubscribe", `Please unsubscribe ${creds.email} and cancel any associated subscription.`).catch(
-        (e) => ({ ok: false, info: String(e) }),
-      );
+      const body = `Please unsubscribe ${account.email} and cancel any associated subscription.`;
+      const r = await (account.authType === "gmail_oauth" && account.oauthCipher
+        ? sendGmail(account.oauthCipher, account.email, mailTarget, "Unsubscribe", body)
+        : sendMail(credsFromAccount(account), mailTarget, "Unsubscribe", body)
+      ).catch((e) => ({ ok: false, info: String(e) }));
       await log(sub.id, "email_unsub", r.ok ? "success" : "failed", `Emailed unsubscribe to ${mailTarget}`, { to: mailTarget }, r);
       steps.push({ type: "email_unsub", status: r.ok ? "success" : "failed", detail: `Emailed unsubscribe → ${mailTarget}` });
     }

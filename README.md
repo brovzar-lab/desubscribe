@@ -3,25 +3,34 @@
 Find **everything you're paying for** across your inboxes and bank/cards, see **how much** and
 **when it's due**, and let AI **unsubscribe / cancel** — full-auto, with an audit trail.
 
-It fuses three signals into one deduplicated list:
+It fuses every signal into one deduplicated list:
 
-- **Email** (multiple mailboxes via IMAP app-passwords) — receipts, invoices, renewals, trials. Claude reads
-  messy emails into structured facts (name, amount, currency, cycle, next due date, cancel link).
-- **Bank & cards** (Plaid) — catches **silent renewals that never email you**, using Plaid's recurring-charge
-  detection (merchant, amount, cadence, predicted next date).
-- **Manual** — anything you add by hand.
+- **Gmail via Google OAuth** — one-click connect; reads receipts, sends cancellations, drives Calendar reminders.
+- **Any mailbox via IMAP** (app-passwords) — multiple inboxes, since subscriptions hide across addresses.
+- **Bank & cards** (Plaid) — catches **silent renewals that never email you** (merchant, amount, cadence, next date).
+- **Screenshot import** — drop a bank-app / app-store / billing screenshot; Claude vision extracts the subs.
+- **CSV import** and **manual add** — anything else.
+
+Claude reads messy emails/images into structured facts (name, amount, currency, cycle, next due date, cancel link),
+then everything is deduplicated across sources.
 
 Then a **full-auto cancel engine** escalates through the cheapest reliable method first:
 `one-click List-Unsubscribe (RFC 8058)` → `SMTP unsubscribe/cancel email` → `Tavily-researched + Playwright-driven cancel page`.
 
 ## What you get
 
-- **Dashboard** — total **monthly** & **annualized** spend, active count, upcoming-renewals timeline,
-  spend-by-category chart.
-- **Money-leak insights** — free trials about to convert, duplicate categories (two music apps…), unused
-  subscriptions (no recent charge), priciest tiers.
-- **One-click & full-auto cancel** per subscription or in bulk.
+- **Dashboard** — monthly & annualized spend, active count, **savings tracker**, **health score (A–F)**,
+  upcoming-renewals timeline, spend-by-category, **spend-over-time trend**.
+- **Money-leak insights** — trials about to convert, duplicate categories, unused subs, priciest tiers,
+  **price-increase detection**, low-confidence **review queue**.
+- **Per-subscription detail page** — charge history, action history, and a cancel-plan preview (with retention tips).
+- **Search / filter / sort**, multi-select with a live **what-if savings** estimate, and **CSV export**.
+- **Full-auto cancel** per sub or in bulk (**cancel all unused / converting trials**), backed by **cancellation
+  playbooks** for big services (Netflix, Spotify, Adobe, Disney+, Prime, NYT, Hulu, YouTube, Apple…).
+- **Reminders** — download a `.ics` of all renewals or push them to **Google Calendar**.
 - **Activity / audit log** — every automated action with status, request/response, and screenshots of web cancels.
+
+See **[FEATURES.md](./FEATURES.md)** for the full tester findings + engineering roadmap.
 
 ## Safety (because cancelling is full-auto)
 
@@ -35,13 +44,16 @@ Then a **full-auto cancel engine** escalates through the cheapest reliable metho
 
 | Need | Tool |
 |---|---|
+| Connect Gmail (read+send) + Calendar | Google OAuth (`googleapis`) |
 | Read inboxes (many accounts) | IMAP (`imapflow`) + `mailparser` |
-| Send unsubscribe/cancel emails | `nodemailer` (SMTP) |
+| Send unsubscribe/cancel emails | Gmail API / `nodemailer` (SMTP) |
 | Detect bank/card subscriptions | Plaid `/transactions/recurring/get` |
-| Extract facts / research cancels | Claude API (`@anthropic-ai/sdk`) |
+| Extract facts / vision / research cancels | Claude API (`@anthropic-ai/sdk`) |
 | One-click unsubscribe | `List-Unsubscribe` + `List-Unsubscribe-Post` (RFC 8058) |
-| Find a merchant's cancel page | Tavily search API |
+| Cancel big services | Built-in **playbooks** + Tavily search fallback |
 | Drive cancel pages | Playwright (optional) |
+| Import / export | `papaparse` (CSV), vision (screenshots) |
+| Renewal reminders | `.ics` (RFC 5545) + Google Calendar API |
 
 ## Quick start
 
@@ -58,8 +70,9 @@ Open the dashboard — it's populated with **sample data** so you can see it wor
 
 1. **Claude key** — put `ANTHROPIC_API_KEY` in `.env` (or paste it in Settings). Without it, extraction falls
    back to regex heuristics.
-2. **Email** — Settings → add each mailbox with an **app-password** (Gmail: Account → Security → App passwords).
-   IMAP/SMTP hosts auto-fill for Gmail/Outlook/Yahoo/iCloud.
+2. **Email** — either **Connect Gmail with Google** (set `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, add the
+   redirect URI `http://localhost:3000/api/google/callback`), **or** add any mailbox with an **app-password**
+   (IMAP/SMTP hosts auto-fill for Gmail/Outlook/Yahoo/iCloud).
 3. **Bank** — set `PLAID_CLIENT_ID` / `PLAID_SECRET` (start with `PLAID_ENV=sandbox`), then Settings → Connect a bank.
 4. **Cancel research** — add `TAVILY_API_KEY` to look up cancellation pages.
 5. **Web cancels** (optional) — `npm i playwright && npx playwright install chromium`.

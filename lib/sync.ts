@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { credsFromAccount, fetchSubscriptionEmails } from "./email/imap";
+import { fetchGmailSubscriptionEmails } from "./email/gmail";
 import { extractFromEmail } from "./email/extract";
 import { getRecurring } from "./plaid";
 import { decrypt } from "./crypto";
@@ -21,8 +22,10 @@ export async function runSync(): Promise<{ added: number; updated: number; scann
   const accounts = await prisma.emailAccount.findMany();
   for (const account of accounts) {
     try {
-      const creds = credsFromAccount(account);
-      const emails = await fetchSubscriptionEmails(creds, { sinceDays: 365, max: 150 });
+      const emails =
+        account.authType === "gmail_oauth" && account.oauthCipher
+          ? await fetchGmailSubscriptionEmails(account.oauthCipher, { sinceDays: 365, max: 150 })
+          : await fetchSubscriptionEmails(credsFromAccount(account), { sinceDays: 365, max: 150 });
       for (const email of emails) {
         const sub = await extractFromEmail(email);
         if (!sub) continue;
@@ -89,23 +92,55 @@ export async function runSync(): Promise<{ added: number; updated: number; scann
     };
 
     if (existing) {
+      // Price-change detection: record the previous amount when it moves.
+      const priceMoved =
+        existing.amount != null && data.amount != null && Math.abs(existing.amount - data.amount) > 0.01;
       await prisma.subscription.update({
         where: { id: existing.id },
         data: {
           ...data,
-          // don't clobber a manual protect flag or amount we already trust
+          protected: existing.protected, // never clobber a manual protect flag
+          reviewNeeded: (data.confidence ?? 0.6) < 0.5,
+          previousAmount: priceMoved ? existing.amount : existing.previousAmount,
+          priceChangedAt: priceMoved ? new Date() : existing.priceChangedAt,
           firstSeenAt: existing.firstSeenAt ?? new Date(),
         },
       });
+      if (data.amount != null)
+        await recordCharge(existing.id, m, data.amount);
       updated++;
     } else {
-      await prisma.subscription.create({ data: { ...data, firstSeenAt: new Date() } });
+      const created = await prisma.subscription.create({
+        data: { ...data, reviewNeeded: (data.confidence ?? 0.6) < 0.5, firstSeenAt: new Date() },
+      });
+      if (data.amount != null) await recordCharge(created.id, m, data.amount);
       added++;
     }
   }
 
   await logSync(`Sync complete: ${added} added, ${updated} updated, ${collected.length} signals.`);
   return { added, updated, scanned: collected.length };
+}
+
+// Record a charge as evidence/history, de-duplicated by (sub, day, amount).
+async function recordCharge(subscriptionId: string, m: SourcedSub, amount: number) {
+  const date = m.lastChargeAt ? new Date(m.lastChargeAt) : new Date();
+  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayEnd = new Date(dayStart.getTime() + 86400_000);
+  const dupe = await prisma.chargeEvent.findFirst({
+    where: { subscriptionId, amount, date: { gte: dayStart, lt: dayEnd } },
+  });
+  if (dupe) return;
+  await prisma.chargeEvent.create({
+    data: {
+      subscriptionId,
+      date,
+      amount,
+      currency: m.currency ?? "USD",
+      source: m.source === "bank" ? "plaid" : m.source,
+      description: m.name,
+    },
+  });
 }
 
 async function logSync(detail: string) {

@@ -24,6 +24,8 @@ async function main() {
 
   const now = Date.now();
   for (const d of DEMO) {
+    // Netflix demo shows a price increase; NYT is reviewNeeded (low confidence).
+    const priceMoved = d.name === "Netflix";
     const sub = await prisma.subscription.create({
       data: {
         name: d.name,
@@ -34,20 +36,46 @@ async function main() {
         source: d.source,
         confidence: d.confidence,
         isTrial: d.isTrial ?? false,
+        reviewNeeded: d.confidence < 0.65,
         cancelUrl: d.cancelUrl ?? null,
         unsubData: d.unsub ? JSON.stringify(d.unsub) : null,
+        previousAmount: priceMoved ? 19.99 : null,
+        priceChangedAt: priceMoved ? new Date(now - 40 * 86400_000) : null,
         nextDueAt: d.daysToDue != null ? new Date(now + d.daysToDue * 86400_000) : null,
+        trialEndsAt: d.isTrial && d.daysToDue != null ? new Date(now + d.daysToDue * 86400_000) : null,
         lastChargeAt: d.daysSinceCharge != null ? new Date(now - d.daysSinceCharge * 86400_000) : null,
         firstSeenAt: new Date(now - 200 * 86400_000),
       },
     });
-    if (d.amount && d.daysSinceCharge != null) {
+    // Seed ~6 months of charge history (for the spend-trend chart).
+    if (d.amount && d.cycle === "monthly") {
+      for (let m = 0; m < 6; m++) {
+        const amt = priceMoved && m >= 2 ? 19.99 : d.amount; // older Netflix charges were cheaper
+        await prisma.chargeEvent.create({
+          data: { subscriptionId: sub.id, date: new Date(now - m * 30 * 86400_000), amount: amt, source: d.source === "bank" ? "plaid" : "email", description: `${d.name} charge` },
+        });
+      }
+    } else if (d.amount && d.daysSinceCharge != null) {
       await prisma.chargeEvent.create({
         data: { subscriptionId: sub.id, date: new Date(now - d.daysSinceCharge * 86400_000), amount: d.amount, source: d.source === "bank" ? "plaid" : "email", description: `${d.name} charge` },
       });
     }
   }
-  console.log(`Seeded ${DEMO.length} demo subscriptions.`);
+
+  // A couple of already-cancelled subs so the Savings tracker shows real numbers.
+  for (const c of [
+    { name: "HBO Max", category: "Streaming", amount: 15.99 },
+    { name: "Audible", category: "Other", amount: 14.95 },
+  ]) {
+    await prisma.subscription.create({
+      data: {
+        name: c.name, merchant: c.name, category: c.category, amount: c.amount, cycle: "monthly",
+        source: "merged", confidence: 0.9, status: "cancelled",
+        cancelledAt: new Date(now - 60 * 86400_000), firstSeenAt: new Date(now - 300 * 86400_000),
+      },
+    });
+  }
+  console.log(`Seeded ${DEMO.length} active + 2 cancelled demo subscriptions.`);
 }
 
 main()

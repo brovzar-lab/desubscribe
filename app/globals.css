@@ -26,3 +26,6 @@ body {
 .pill {
   @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
 }
+.input {
+  @apply rounded-lg border border-edge bg-ink px-3 py-1.5 text-sm text-white;
+}

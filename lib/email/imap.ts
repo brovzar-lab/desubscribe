@@ -17,13 +17,22 @@ interface AccountCreds {
 
 export function credsFromAccount(a: {
   email: string;
-  imapHost: string;
+  imapHost: string | null;
   imapPort: number;
-  smtpHost: string;
+  smtpHost: string | null;
   smtpPort: number;
-  secretCipher: string;
+  secretCipher: string | null;
 }): AccountCreds {
-  return { ...a, password: decrypt(a.secretCipher) };
+  if (!a.imapHost || !a.smtpHost || !a.secretCipher)
+    throw new Error(`Account ${a.email} is missing IMAP credentials`);
+  return {
+    email: a.email,
+    imapHost: a.imapHost,
+    imapPort: a.imapPort,
+    smtpHost: a.smtpHost,
+    smtpPort: a.smtpPort,
+    password: decrypt(a.secretCipher),
+  };
 }
 
 // Common-provider defaults so the user only needs an email + app-password.
