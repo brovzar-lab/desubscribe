@@ -28,6 +28,9 @@ Then a **full-auto cancel engine** escalates through the cheapest reliable metho
 - **Full-auto cancel** per sub or in bulk (**cancel all unused / converting trials**), backed by **cancellation
   playbooks** for big services (Netflix, Spotify, Adobe, Disney+, Prime, NYT, Hulu, YouTube, Apple…).
 - **Reminders** — download a `.ics` of all renewals or push them to **Google Calendar**.
+- **Billing anomaly alerts** — double charges, charges *after* you cancelled, and price spikes.
+- **Retention assistant** — Claude drafts a pause / downgrade / ask-for-a-discount message before you cancel.
+- **Weekly digest + scheduled sync** — `POST /api/cron` (sync + email digest) for any scheduler; preview at `/api/digest`.
 - **Activity / audit log** — every automated action with status, request/response, and screenshots of web cancels.
 
 See **[FEATURES.md](./FEATURES.md)** for the full tester findings + engineering roadmap.

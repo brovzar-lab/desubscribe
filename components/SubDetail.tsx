@@ -17,6 +17,7 @@ interface Action { type: string; status: string; detail: string | null; createdA
 export default function SubDetail({ sub, charges, actions }: { sub: Sub; charges: Charge[]; actions: Action[] }) {
   const router = useRouter();
   const [plan, setPlan] = useState<string | null>(null);
+  const [retention, setRetention] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -30,6 +31,15 @@ export default function SubDetail({ sub, charges, actions }: { sub: Sub; charges
         ? `Method: ${p.method} · Source: ${p.source}\n${p.cancelUrl ? "URL: " + p.cancelUrl + "\n" : ""}${p.phone ? "Phone: " + p.phone + "\n" : ""}Steps:\n- ${p.steps.join("\n- ")}${p.retentionTip ? "\n\n💡 " + p.retentionTip : ""}`
         : "No plan.",
     );
+    setBusy(false);
+  }
+
+  async function loadRetention() {
+    setBusy(true);
+    const res = await fetch(`/api/subscriptions/${sub.id}/retention`);
+    const data = await res.json();
+    const d = data.draft;
+    setRetention(d ? `Strategy: ${d.strategy}\nWhy: ${d.rationale}\n\nSubject: ${d.subject}\n\n${d.body}` : "No draft.");
     setBusy(false);
   }
 
@@ -71,6 +81,8 @@ export default function SubDetail({ sub, charges, actions }: { sub: Sub; charges
 
         <div className="mt-4 flex flex-wrap gap-2">
           <button className="btn-ghost" onClick={loadPlan} disabled={busy}>Preview cancel plan</button>
+          <button className="btn-ghost" onClick={loadRetention} disabled={busy}>💰 Draft retention offer</button>
+          <button className="btn-ghost" onClick={() => action(`/api/subscriptions/${sub.id}/retention`, {})} disabled={busy}>Save retention draft to mailbox</button>
           <button className="btn-ghost" onClick={() => action(`/api/subscriptions/${sub.id}`, { protected: !sub.protected })} disabled={busy}>
             {sub.protected ? "🔒 Protected" : "🔓 Protect"}
           </button>
@@ -78,6 +90,7 @@ export default function SubDetail({ sub, charges, actions }: { sub: Sub; charges
           <button className="btn-danger" onClick={() => action("/api/cancel", { id: sub.id })} disabled={busy || sub.protected || sub.status !== "active"}>Cancel now</button>
         </div>
         {plan && <pre className="mt-3 whitespace-pre-wrap rounded-lg border border-edge bg-ink p-3 text-xs text-muted">{plan}</pre>}
+        {retention && <pre className="mt-3 whitespace-pre-wrap rounded-lg border border-good/40 bg-good/5 p-3 text-xs text-muted">{retention}</pre>}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

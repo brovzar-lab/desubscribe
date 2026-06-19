@@ -64,18 +64,32 @@ async function main() {
 
   // A couple of already-cancelled subs so the Savings tracker shows real numbers.
   for (const c of [
-    { name: "HBO Max", category: "Streaming", amount: 15.99 },
+    { name: "HBO Max", category: "Streaming", amount: 15.99, postCancelCharge: true },
     { name: "Audible", category: "Other", amount: 14.95 },
   ]) {
-    await prisma.subscription.create({
+    const cancelled = await prisma.subscription.create({
       data: {
         name: c.name, merchant: c.name, category: c.category, amount: c.amount, cycle: "monthly",
         source: "merged", confidence: 0.9, status: "cancelled",
         cancelledAt: new Date(now - 60 * 86400_000), firstSeenAt: new Date(now - 300 * 86400_000),
       },
     });
+    // Anomaly: a charge that landed AFTER cancellation (HBO Max).
+    if (c.postCancelCharge) {
+      await prisma.chargeEvent.create({
+        data: { subscriptionId: cancelled.id, date: new Date(now - 20 * 86400_000), amount: c.amount, source: "plaid", description: `${c.name} charge` },
+      });
+    }
   }
-  console.log(`Seeded ${DEMO.length} active + 2 cancelled demo subscriptions.`);
+
+  // Anomaly: a duplicate charge on Spotify (two within a few days).
+  const spotify = await prisma.subscription.findFirst({ where: { name: "Spotify" } });
+  if (spotify?.amount) {
+    await prisma.chargeEvent.create({
+      data: { subscriptionId: spotify.id, date: new Date(now - 27 * 86400_000), amount: spotify.amount, source: "plaid", description: "Spotify charge (dup)" },
+    });
+  }
+  console.log(`Seeded ${DEMO.length} active + 2 cancelled demo subscriptions (with anomalies).`);
 }
 
 main()

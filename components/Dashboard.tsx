@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Insight } from "@/lib/insights";
+import type { Anomaly } from "@/lib/anomalies";
 import CategoryChart from "./CategoryChart";
 import TrendChart from "./TrendChart";
 import { monthlyEq, fmtMoney, cycleLabel, dueLabel } from "./format";
@@ -23,6 +24,7 @@ interface Props {
   savings: { monthly: number; annualized: number; realized: number; count: number };
   health: { score: number; grade: string; reasons: string[] };
   trend: { month: string; total: number }[];
+  anomalies: Anomaly[];
   automationLevel: string;
   killSwitch: boolean;
   demoMode: boolean;
@@ -129,6 +131,7 @@ export default function Dashboard(props: Props) {
         <a className="btn-ghost" href="/api/export/csv">Export CSV</a>
         <a className="btn-ghost" href="/api/calendar/ics">Download .ics</a>
         <button className="btn-ghost" onClick={() => post("/api/calendar/google", {}, "gcal")} disabled={busy === "gcal"}>Push to Google Calendar</button>
+        <button className="btn-ghost" onClick={() => post("/api/digest", {}, "digest")} disabled={busy === "digest"}>Email me a digest</button>
         <div className="mx-1 h-5 w-px bg-edge" />
         <button className="btn-danger" onClick={() => post("/api/cancel/bulk", { filter: "unused" }, "bulk-unused")} disabled={busy !== null}>
           Cancel all unused
@@ -141,6 +144,21 @@ export default function Dashboard(props: Props) {
       </div>
 
       {showAdd && <AddForm onAdd={(b) => { post("/api/subscriptions", b, "add"); setShowAdd(false); }} />}
+
+      {/* Billing anomalies — surfaced loudly, they cost real money */}
+      {props.anomalies.length > 0 && (
+        <div className="card border-bad/40 bg-bad/10">
+          <h2 className="mb-2 font-semibold text-bad">⚠ Billing anomalies ({props.anomalies.length})</h2>
+          <ul className="space-y-1 text-sm">
+            {props.anomalies.slice(0, 8).map((a, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className={`pill ${a.severity === "bad" ? "bg-bad/20 text-bad" : "bg-warn/20 text-warn"}`}>{a.kind.replace(/_/g, " ")}</span>
+                <Link href={`/sub/${a.subscriptionId}`} className="text-muted hover:text-white">{a.message}</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Insights + charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

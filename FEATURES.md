@@ -33,15 +33,23 @@ engineered fixes + new features. This is the running record.
 **Reminders** — .ics export · Google Calendar push.
 **Safety** — protect flag · dry-run · global kill-switch · confirm-over-$ threshold · encrypted credentials · full audit log.
 
-## 🚧 Engineer's roadmap — what I'd build next
+## ✅ Roadmap items now shipped
 
-1. **Scheduled background sync + push/email digest** (weekly "here's what renews + leaks" summary). Needs a cron route + a notifier (`lib/notify.ts`); reuse Gmail send.
-2. **Retention/negotiation assistant** — Claude drafts a "pause / downgrade / ask-for-discount" message before you cancel (playbooks already carry `retentionTip`).
-3. **Virtual-card / block-merchant guidance** when a service won't let you cancel online.
-4. **Browser-extension or email-forwarding capture** so new receipts land instantly without a full inbox scan.
-5. **Multi-currency** normalization with live FX (store native + USD).
-6. **Shared/household subscriptions** — split cost, per-member ownership.
-7. **Anomaly alerts** — "charged 2× this month" / "charged after you cancelled."
-8. **Confidence-driven review inbox** — approve/reject detections to train better merchant keys.
-9. **Encryption-key in OS keychain** instead of `.env`; per-user auth for multi-user/hosted mode.
-10. **Playwright cancel-flow recorder** — record a cancel once, replay it as a per-merchant macro.
+- **Scheduled sync + weekly digest** — `POST /api/cron` (sync + email) for an OS/external scheduler with
+  optional `CRON_SECRET`; `GET/POST /api/digest` to preview/send. Digest = spend, renewals (14d), leaks,
+  anomalies, savings. Code: `lib/digest.ts`.
+- **Retention/negotiation assistant** — Claude drafts a pause/downgrade/discount message (uses playbook
+  `retentionTip`); can save it as a Gmail draft or send. `lib/retention.ts`,
+  `/api/subscriptions/[id]/retention`, button on the detail page.
+- **Anomaly alerts** — double charges, charges after cancellation, and price spikes, surfaced on the dashboard
+  and in the digest. `lib/anomalies.ts`.
+
+## 🚧 Engineer's roadmap — still ahead
+
+1. **Virtual-card / block-merchant guidance** when a service won't let you cancel online.
+2. **Browser-extension or email-forwarding capture** so new receipts land instantly without a full inbox scan.
+3. **Multi-currency** normalization with live FX (store native + USD).
+4. **Shared/household subscriptions** — split cost, per-member ownership.
+5. **Confidence-driven review inbox** — approve/reject detections to train better merchant keys.
+6. **Encryption-key in OS keychain** instead of `.env`; per-user auth for multi-user/hosted mode.
+7. **Playwright cancel-flow recorder** — record a cancel once, replay it as a per-merchant macro.
