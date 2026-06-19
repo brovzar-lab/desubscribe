@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { computeInsights, totals, spendByCategory, type SubLike } from "@/lib/insights";
 import { savings, healthScore, spendTrend } from "@/lib/analytics";
 import { detectAnomalies, type SubWithCharges } from "@/lib/anomalies";
+import { forecast, forecastTotal } from "@/lib/forecast";
 import { getBaseCurrency, getRates, convert } from "@/lib/fx";
 import { getAutomationLevel, isKillSwitchOn, isDemoMode } from "@/lib/settings";
 import Dashboard from "@/components/Dashboard";
@@ -37,6 +38,11 @@ export default async function Home() {
     duplicate: insights.filter((i) => i.kind === "duplicate").length,
   });
   const trend = spendTrend(charges, 6);
+  const forecastPoints = forecast(
+    rows.map((r) => ({ amount: toBase(r.amount, r.currency), cycle: r.cycle, status: r.status, nextDueAt: r.nextDueAt })),
+    12,
+  );
+  const forecast12mo = forecastTotal(forecastPoints);
   const anomalies = detectAnomalies(
     rows.map<SubWithCharges>((r) => ({
       id: r.id, name: r.name, amount: r.amount, status: r.status, cancelledAt: r.cancelledAt, charges: r.charges,
@@ -70,6 +76,8 @@ export default async function Home() {
       health={health}
       trend={trend}
       anomalies={anomalies.map((a) => ({ ...a }))}
+      forecast={forecastPoints}
+      forecast12mo={forecast12mo}
       baseCurrency={baseCurrency}
       automationLevel={level}
       killSwitch={killed}

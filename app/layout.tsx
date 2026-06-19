@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import LogoutLink from "@/components/LogoutLink";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/review" className="hover:text-white">Review</Link>
               <Link href="/activity" className="hover:text-white">Activity</Link>
               <Link href="/settings" className="hover:text-white">Settings</Link>
+              {process.env.APP_PASSWORD && <LogoutLink />}
             </nav>
           </header>
           {children}

@@ -28,6 +28,9 @@ Then a **full-auto cancel engine** escalates through the cheapest reliable metho
 - **Full-auto cancel** per sub or in bulk (**cancel all unused / converting trials**), backed by **cancellation
   playbooks** for big services (Netflix, Spotify, Adobe, Disney+, Prime, NYT, Hulu, YouTube, Apple…).
 - **Reminders** — download a `.ics` of all renewals or push them to **Google Calendar**.
+- **12-month spend forecast** — projects future spend with annual-renewal spikes called out.
+- **Inbound email webhook** — forward receipts to `/api/webhook/inbound` for real-time capture.
+- **Optional app lock** — set `APP_PASSWORD` to gate the whole app behind a sign-in.
 - **Household & cost splitting** — split subscriptions across members; see per-person totals and your share.
 - **Cancel-macro recorder** — record a cancel once (`playwright codegen`); the engine replays it precisely.
 - **Multi-currency** — pick a base currency; totals normalize via live FX (daily-cached, offline fallback).

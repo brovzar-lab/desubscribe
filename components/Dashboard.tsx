@@ -7,6 +7,7 @@ import type { Insight } from "@/lib/insights";
 import type { Anomaly } from "@/lib/anomalies";
 import CategoryChart from "./CategoryChart";
 import TrendChart from "./TrendChart";
+import ForecastChart from "./ForecastChart";
 import { monthlyEq, fmtMoney, cycleLabel, dueLabel } from "./format";
 
 export interface ClientSub {
@@ -26,6 +27,8 @@ interface Props {
   health: { score: number; grade: string; reasons: string[] };
   trend: { month: string; total: number }[];
   anomalies: Anomaly[];
+  forecast: { month: string; projected: number }[];
+  forecast12mo: number;
   baseCurrency: string;
   automationLevel: string;
   killSwitch: boolean;
@@ -215,6 +218,15 @@ export default function Dashboard(props: Props) {
           <h2 className="mb-3 font-semibold">Spend by category</h2>
           <CategoryChart data={props.byCategory} />
         </div>
+      </div>
+
+      {/* 12-month forecast */}
+      <div className="card">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold">12-month spend forecast</h2>
+          <span className="text-sm text-muted">projected total <b className="text-white">{fmtMoney(props.forecast12mo, props.baseCurrency)}</b> · amber = annual-renewal spikes</span>
+        </div>
+        <ForecastChart data={props.forecast} currency={props.baseCurrency} />
       </div>
 
       {/* Filters */}

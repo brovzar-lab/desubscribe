@@ -65,9 +65,18 @@ engineered fixes + new features. This is the running record.
 - **Virtual-card / block-merchant guidance** — when a service stonewalls, the plan preview shows how to cut the
   charges off (virtual card, stop-payment, dispute). `lib/cancel/blockGuidance.ts`.
 
+## ✅ Roadmap wave 4 — now shipped
+
+- **12-month spend forecast** (`lib/forecast.ts`) — projects monthly spend, landing quarterly/annual renewals as
+  **lumps** on their real billing months (amber spikes) so you can plan for them. Bar chart on the dashboard.
+- **Inbound email webhook** (`/api/webhook/inbound`) — point an email-forwarding service (SendGrid Inbound Parse,
+  Mailgun routes) at it to capture receipts in real time. Accepts form-encoded, raw MIME, or JSON; guarded by
+  `INBOUND_TOKEN`. Shared ingest logic in `lib/ingest.ts`.
+- **App lock** — optional `APP_PASSWORD` gates the whole app behind a sign-in (`middleware.ts`, `/login`); APIs
+  return 401, pages redirect. Webhook/cron keep their own token auth. Stays fully open when unset (local use).
+
 ## 🚧 Engineer's roadmap — still ahead
 
-1. **Encryption-key in OS keychain** instead of `.env`; per-user auth for multi-user/hosted mode.
-2. **Inbound email webhook** (a forwarding address) to auto-capture receipts in real time.
-3. **In-app cancel-macro recorder** (launch a headed browser, capture clicks) so you don't need the CLI.
-4. **Spending forecasts** — project next 12 months incl. known annual renewals.
+1. **Encryption-key in OS keychain** instead of `.env`; true multi-user accounts.
+2. **In-app cancel-macro recorder** (launch a headed browser, capture clicks) so you don't need the CLI.
+3. **Bank-sync scheduling** via Plaid webhooks for instant new-charge detection.
