@@ -2,9 +2,13 @@ import { monthlyAmount } from "@/lib/insights";
 
 export const monthlyEq = monthlyAmount;
 
-export function fmtMoney(n: number | null | undefined): string {
+export function fmtMoney(n: number | null | undefined, currency = "USD"): string {
   if (n == null) return "—";
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: n % 1 === 0 ? 0 : 2 });
+  try {
+    return n.toLocaleString("en-US", { style: "currency", currency, maximumFractionDigits: n % 1 === 0 ? 0 : 2 });
+  } catch {
+    return `${currency} ${n.toFixed(2)}`;
+  }
 }
 
 export function cycleLabel(cycle: string): string {

@@ -4,7 +4,7 @@ import { fetchGmailSubscriptionEmails } from "./email/gmail";
 import { extractFromEmail } from "./email/extract";
 import { getRecurring } from "./plaid";
 import { decrypt } from "./crypto";
-import { mergeSubs } from "./dedupe";
+import { mergeSubs, merchantKey } from "./dedupe";
 import { sameService } from "./dedupe";
 import type { ExtractedSub } from "./types";
 
@@ -66,7 +66,18 @@ export async function runSync(): Promise<{ added: number; updated: number; scann
     }
   }
 
-  // 3) Merge across sources, then upsert into the unified table ---------------
+  // 3) Apply learned aliases (from the review inbox), then merge + upsert ------
+  const aliases = await prisma.merchantAlias.findMany();
+  if (aliases.length) {
+    const map = new Map(aliases.map((a) => [a.aliasKey, a.canonical]));
+    for (const item of collected) {
+      const canonical = map.get(merchantKey(item.merchant || item.name));
+      if (canonical) {
+        item.name = canonical;
+        item.merchant = canonical;
+      }
+    }
+  }
   const merged = mergeSubs(collected);
   let added = 0;
   let updated = 0;

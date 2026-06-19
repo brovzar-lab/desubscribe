@@ -105,3 +105,13 @@ model Setting {
   key   String @id
   value String
 }
+
+// Learned merchant aliases: maps a normalized variant key -> canonical service
+// name. Built when you merge duplicates in the review inbox, so future syncs
+// dedupe correctly. This is the "training" memory.
+model MerchantAlias {
+  id        String   @id @default(cuid())
+  aliasKey  String   @unique // normalized merchantKey of the variant
+  canonical String // canonical display name to use
+  createdAt DateTime @default(now())
+}

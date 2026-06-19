@@ -11,6 +11,7 @@ import { monthlyEq, fmtMoney, cycleLabel, dueLabel } from "./format";
 
 export interface ClientSub {
   id: string; name: string; category: string; amount: number | null; currency: string;
+  baseAmount: number | null;
   cycle: string; status: string; source: string; confidence: number; protected: boolean;
   isTrial: boolean; reviewNeeded: boolean; nextDueAt: string | null; lastChargeAt: string | null;
   hasUnsub: boolean; cancelUrl: string | null; priceChangedAt: string | null;
@@ -25,6 +26,7 @@ interface Props {
   health: { score: number; grade: string; reasons: string[] };
   trend: { month: string; total: number }[];
   anomalies: Anomaly[];
+  baseCurrency: string;
   automationLevel: string;
   killSwitch: boolean;
   demoMode: boolean;
@@ -42,8 +44,27 @@ export default function Dashboard(props: Props) {
   const [catFilter, setCatFilter] = useState("all");
   const [sort, setSort] = useState<Sort>("amount");
   const [showAdd, setShowAdd] = useState(false);
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteText, setPasteText] = useState("");
   const csvRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
+
+  async function pasteReceipt() {
+    setBusy("paste");
+    try {
+      const res = await fetch("/api/ingest/email", { method: "POST", headers: { "Content-Type": "text/plain" }, body: pasteText });
+      const data = await res.json();
+      setToast(data.message || "Done");
+      setPasteText("");
+      setShowPaste(false);
+      router.refresh();
+    } catch (e) {
+      setToast("Error: " + String(e));
+    } finally {
+      setBusy(null);
+      setTimeout(() => setToast(null), 7000);
+    }
+  }
 
   async function post(url: string, body: unknown, label: string) {
     setBusy(label);
@@ -88,14 +109,14 @@ export default function Dashboard(props: Props) {
     return [...list].sort((a, b) => {
       if (sort === "name") return a.name.localeCompare(b.name);
       if (sort === "due") return (a.nextDueAt ? +new Date(a.nextDueAt) : Infinity) - (b.nextDueAt ? +new Date(b.nextDueAt) : Infinity);
-      return monthlyEq(b.amount, b.cycle) - monthlyEq(a.amount, a.cycle);
+      return monthlyEq(b.baseAmount, b.cycle) - monthlyEq(a.baseAmount, a.cycle);
     });
   }, [props.subs, statusFilter, catFilter, query, sort]);
 
   const reviewCount = props.subs.filter((s) => s.reviewNeeded && s.status === "active").length;
   const selectedSavings = props.subs
     .filter((s) => selected.has(s.id))
-    .reduce((sum, s) => sum + monthlyEq(s.amount, s.cycle) * 12, 0);
+    .reduce((sum, s) => sum + monthlyEq(s.baseAmount, s.cycle) * 12, 0);
 
   function toggle(id: string) {
     const next = new Set(selected);
@@ -113,10 +134,10 @@ export default function Dashboard(props: Props) {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-        <Stat label="Monthly spend" value={fmtMoney(props.totals.monthly)} accent />
-        <Stat label="Annualized" value={fmtMoney(props.totals.yearly)} />
+        <Stat label="Monthly spend" value={fmtMoney(props.totals.monthly, props.baseCurrency)} accent />
+        <Stat label="Annualized" value={fmtMoney(props.totals.yearly, props.baseCurrency)} />
         <Stat label="Active" value={String(props.totals.count)} />
-        <Stat label="Saved / yr" value={fmtMoney(props.savings.annualized)} good />
+        <Stat label="Saved / yr" value={fmtMoney(props.savings.annualized, props.baseCurrency)} good />
         <HealthStat health={props.health} />
       </div>
 
@@ -126,6 +147,7 @@ export default function Dashboard(props: Props) {
           {busy === "sync" ? "Syncing…" : "Sync now"}
         </button>
         <button className="btn-ghost" onClick={() => setShowAdd((v) => !v)}>+ Add</button>
+        <button className="btn-ghost" onClick={() => setShowPaste((v) => !v)}>Paste receipt</button>
         <button className="btn-ghost" onClick={() => csvRef.current?.click()}>Import CSV</button>
         <button className="btn-ghost" onClick={() => imgRef.current?.click()}>Import screenshot</button>
         <a className="btn-ghost" href="/api/export/csv">Export CSV</a>
@@ -145,6 +167,14 @@ export default function Dashboard(props: Props) {
 
       {showAdd && <AddForm onAdd={(b) => { post("/api/subscriptions", b, "add"); setShowAdd(false); }} />}
 
+      {showPaste && (
+        <div className="card space-y-2">
+          <p className="text-sm text-muted">Paste a forwarded receipt / billing email (raw or just the text). Claude extracts the subscription.</p>
+          <textarea className="input h-32 w-full font-mono" value={pasteText} onChange={(e) => setPasteText(e.target.value)} placeholder="From: billing@service.com&#10;Subject: Your receipt&#10;&#10;You were charged $9.99…" />
+          <button className="btn-primary" disabled={!pasteText.trim() || busy === "paste"} onClick={pasteReceipt}>{busy === "paste" ? "Reading…" : "Capture"}</button>
+        </div>
+      )}
+
       {/* Billing anomalies — surfaced loudly, they cost real money */}
       {props.anomalies.length > 0 && (
         <div className="card border-bad/40 bg-bad/10">
@@ -163,7 +193,7 @@ export default function Dashboard(props: Props) {
       {/* Insights + charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="card lg:col-span-2">
-          <h2 className="mb-3 font-semibold">Money-leak insights {reviewCount > 0 && <span className="pill bg-warn/20 text-warn">{reviewCount} to review</span>}</h2>
+          <h2 className="mb-3 font-semibold">Money-leak insights {reviewCount > 0 && <Link href="/review" className="pill bg-warn/20 text-warn hover:brightness-125">{reviewCount} to review →</Link>}</h2>
           {props.insights.length === 0 ? (
             <p className="text-sm text-muted">No leaks detected. Nice.</p>
           ) : (
@@ -199,7 +229,7 @@ export default function Dashboard(props: Props) {
       {/* Bulk bar */}
       {selected.size > 0 && (
         <div className="card flex flex-wrap items-center gap-3 border-brand/40 bg-brand/10 text-sm">
-          <span>{selected.size} selected · what-if savings <b className="text-good">{fmtMoney(selectedSavings)}/yr</b></span>
+          <span>{selected.size} selected · what-if savings <b className="text-good">{fmtMoney(selectedSavings, props.baseCurrency)}/yr</b></span>
           <button className="btn-ghost" onClick={() => post("/api/cancel/bulk", { ids: [...selected], dryRun: true }, "bulk-dry")} disabled={busy !== null}>Dry-run</button>
           <button className="btn-danger" onClick={() => post("/api/cancel/bulk", { ids: [...selected] }, "bulk-sel")} disabled={busy !== null}>Cancel selected</button>
           <button className="btn-ghost" onClick={() => setSelected(new Set())}>Clear</button>
@@ -234,8 +264,8 @@ export default function Dashboard(props: Props) {
                   <div className="text-xs text-muted">{s.category} · {Math.round(s.confidence * 100)}% sure</div>
                 </td>
                 <td>
-                  <div>{fmtMoney(s.amount)}</div>
-                  <div className="text-xs text-muted">{cycleLabel(s.cycle)} · {fmtMoney(monthlyEq(s.amount, s.cycle))}/mo</div>
+                  <div>{fmtMoney(s.amount, s.currency)}</div>
+                  <div className="text-xs text-muted">{cycleLabel(s.cycle)} · {fmtMoney(monthlyEq(s.amount, s.cycle), s.currency)}/mo</div>
                 </td>
                 <td>{dueLabel(s.nextDueAt)}</td>
                 <td><span className="pill bg-edge text-muted">{s.source}</span></td>

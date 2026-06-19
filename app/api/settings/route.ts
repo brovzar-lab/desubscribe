@@ -8,6 +8,8 @@ const Body = z.object({
   automationLevel: z.enum(["full_auto", "auto_marketing", "draft_only"]).optional(),
   killSwitch: z.enum(["on", "off"]).optional(),
   anthropicApiKey: z.string().optional(),
+  baseCurrency: z.string().length(3).optional(),
+  digestEmail: z.string().email().optional(),
 });
 
 export async function POST(req: Request) {

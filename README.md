@@ -28,6 +28,9 @@ Then a **full-auto cancel engine** escalates through the cheapest reliable metho
 - **Full-auto cancel** per sub or in bulk (**cancel all unused / converting trials**), backed by **cancellation
   playbooks** for big services (Netflix, Spotify, Adobe, Disney+, Prime, NYT, Hulu, YouTube, Apple…).
 - **Reminders** — download a `.ics` of all renewals or push them to **Google Calendar**.
+- **Multi-currency** — pick a base currency; totals normalize via live FX (daily-cached, offline fallback).
+- **Review inbox** — approve/reject/**merge** low-confidence detections; merging *teaches* the deduper.
+- **Paste / forward a receipt** — capture one subscription without scanning your whole inbox.
 - **Billing anomaly alerts** — double charges, charges *after* you cancelled, and price spikes.
 - **Retention assistant** — Claude drafts a pause / downgrade / ask-for-a-discount message before you cancel.
 - **Weekly digest + scheduled sync** — `POST /api/cron` (sync + email digest) for any scheduler; preview at `/api/digest`.

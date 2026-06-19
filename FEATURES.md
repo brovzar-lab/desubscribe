@@ -44,12 +44,20 @@ engineered fixes + new features. This is the running record.
 - **Anomaly alerts** — double charges, charges after cancellation, and price spikes, surfaced on the dashboard
   and in the digest. `lib/anomalies.ts`.
 
+## ✅ Roadmap wave 2 — now shipped
+
+- **Multi-currency + live FX** — base-currency setting; all aggregate math normalizes native amounts to the base
+  via daily-cached FX (`api.frankfurter.dev`), with an offline fallback table. Per-row shows native currency.
+  `lib/fx.ts`. (Live rates need that host allowed in egress; otherwise approximate fallback is used.)
+- **Review inbox** (`/review`) — approve / reject / **merge** low-confidence detections. Merging **learns a
+  `MerchantAlias`** so future syncs fold that variant automatically. `lib/sync.ts` applies aliases before dedupe.
+- **Email-forward / paste capture** — `POST /api/ingest/email` (raw RFC822 or `{from,subject,text}`) extracts one
+  receipt without a full inbox scan; "Paste receipt" box on the dashboard.
+
 ## 🚧 Engineer's roadmap — still ahead
 
 1. **Virtual-card / block-merchant guidance** when a service won't let you cancel online.
-2. **Browser-extension or email-forwarding capture** so new receipts land instantly without a full inbox scan.
-3. **Multi-currency** normalization with live FX (store native + USD).
-4. **Shared/household subscriptions** — split cost, per-member ownership.
-5. **Confidence-driven review inbox** — approve/reject detections to train better merchant keys.
-6. **Encryption-key in OS keychain** instead of `.env`; per-user auth for multi-user/hosted mode.
-7. **Playwright cancel-flow recorder** — record a cancel once, replay it as a per-merchant macro.
+2. **Shared/household subscriptions** — split cost, per-member ownership.
+3. **Encryption-key in OS keychain** instead of `.env`; per-user auth for multi-user/hosted mode.
+4. **Playwright cancel-flow recorder** — record a cancel once, replay it as a per-merchant macro.
+5. **Inbound email webhook** (e.g. forwarding address) to auto-capture receipts in real time.

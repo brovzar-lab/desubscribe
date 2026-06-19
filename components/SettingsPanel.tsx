@@ -62,6 +62,24 @@ export default function SettingsPanel(props: Props) {
         </label>
       </section>
 
+      {/* Preferences */}
+      <section className="card space-y-3">
+        <h2 className="font-semibold">Preferences</h2>
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-xs text-muted">Base currency (totals shown in this)</span>
+            <select className="input" defaultValue="" onChange={(e) => e.target.value && save("/api/settings", { baseCurrency: e.target.value })}>
+              <option value="" disabled>Choose…</option>
+              {["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "INR", "BRL", "MXN", "CHF", "SEK"].map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-xs text-muted">Digest email (defaults to first mailbox)</span>
+            <DigestEmail onSave={(v) => save("/api/settings", { digestEmail: v })} />
+          </label>
+        </div>
+      </section>
+
       {/* AI key */}
       <section className="card space-y-3">
         <h2 className="font-semibold">Claude API key {props.hasAnthropicKey && <span className="pill bg-good/20 text-good">set</span>}</h2>
@@ -120,6 +138,16 @@ export default function SettingsPanel(props: Props) {
       {msg && (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 rounded-lg border border-edge bg-panel px-4 py-2 text-sm shadow-lg">{msg}</div>
       )}
+    </div>
+  );
+}
+
+function DigestEmail({ onSave }: { onSave: (v: string) => void }) {
+  const [v, setV] = useState("");
+  return (
+    <div className="flex gap-2">
+      <input className="input" placeholder="you@example.com" value={v} onChange={(e) => setV(e.target.value)} />
+      <button className="btn-ghost" onClick={() => v && onSave(v)}>Save</button>
     </div>
   );
 }

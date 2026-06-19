@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { computeInsights, totals, spendByCategory, type SubLike } from "@/lib/insights";
 import { savings, healthScore, spendTrend } from "@/lib/analytics";
 import { detectAnomalies, type SubWithCharges } from "@/lib/anomalies";
+import { getBaseCurrency, getRates, convert } from "@/lib/fx";
 import { getAutomationLevel, isKillSwitchOn, isDemoMode } from "@/lib/settings";
 import Dashboard from "@/components/Dashboard";
 
@@ -10,12 +11,18 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const rows = await prisma.subscription.findMany({
     orderBy: { amount: "desc" },
-    include: { charges: { select: { date: true, amount: true }, orderBy: { date: "desc" } } },
+    include: { charges: { select: { date: true, amount: true, currency: true }, orderBy: { date: "desc" } } },
   });
-  const charges = rows.flatMap((r) => r.charges);
+
+  // Normalize all money to a single base currency for aggregate math.
+  const baseCurrency = await getBaseCurrency();
+  const rates = await getRates(baseCurrency);
+  const toBase = (amt: number | null, cur: string) => (amt == null ? null : convert(amt, cur, rates));
+
+  const charges = rows.flatMap((r) => r.charges.map((c) => ({ date: c.date, amount: convert(c.amount, c.currency, rates) })));
 
   const subs: SubLike[] = rows.map((r) => ({
-    id: r.id, name: r.name, amount: r.amount, cycle: r.cycle, status: r.status,
+    id: r.id, name: r.name, amount: toBase(r.amount, r.currency), cycle: r.cycle, status: r.status,
     category: r.category, nextDueAt: r.nextDueAt, lastChargeAt: r.lastChargeAt,
     isTrial: r.isTrial, source: r.source,
   }));
@@ -44,6 +51,7 @@ export default async function Home() {
 
   const clientSubs = rows.map((r) => ({
     id: r.id, name: r.name, category: r.category, amount: r.amount, currency: r.currency,
+    baseAmount: toBase(r.amount, r.currency), // base-currency equiv for sorting/what-if
     cycle: r.cycle, status: r.status, source: r.source, confidence: r.confidence,
     protected: r.protected, isTrial: r.isTrial, reviewNeeded: r.reviewNeeded,
     nextDueAt: r.nextDueAt?.toISOString() ?? null,
@@ -62,6 +70,7 @@ export default async function Home() {
       health={health}
       trend={trend}
       anomalies={anomalies.map((a) => ({ ...a }))}
+      baseCurrency={baseCurrency}
       automationLevel={level}
       killSwitch={killed}
       demoMode={demo}

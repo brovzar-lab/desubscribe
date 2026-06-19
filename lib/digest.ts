@@ -5,9 +5,14 @@ import { detectAnomalies, type SubWithCharges } from "./anomalies";
 import { credsFromAccount, sendMail } from "./email/imap";
 import { sendGmail } from "./email/gmail";
 import { getSetting } from "./settings";
+import { getBaseCurrency, getRates, convert } from "./fx";
 
-function money(n: number): string {
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+function money(n: number, currency = "USD"): string {
+  try {
+    return n.toLocaleString("en-US", { style: "currency", currency });
+  } catch {
+    return `${currency} ${n.toFixed(2)}`;
+  }
 }
 
 export interface Digest {
@@ -21,10 +26,12 @@ export async function buildDigest(): Promise<Digest> {
   const rows = await prisma.subscription.findMany({
     include: { charges: { select: { date: true, amount: true } } },
   });
+  const base = await getBaseCurrency();
+  const rates = await getRates(base);
   const subs: SubLike[] = rows.map((r) => ({
-    id: r.id, name: r.name, amount: r.amount, cycle: r.cycle, status: r.status,
-    category: r.category, nextDueAt: r.nextDueAt, lastChargeAt: r.lastChargeAt,
-    isTrial: r.isTrial, source: r.source,
+    id: r.id, name: r.name, amount: r.amount == null ? null : convert(r.amount, r.currency, rates),
+    cycle: r.cycle, status: r.status, category: r.category, nextDueAt: r.nextDueAt,
+    lastChargeAt: r.lastChargeAt, isTrial: r.isTrial, source: r.source,
   }));
 
   const t = totals(subs);
@@ -48,12 +55,12 @@ export async function buildDigest(): Promise<Digest> {
 
   const lines: string[] = [];
   lines.push(`Your Desubscribe weekly digest`, ``);
-  lines.push(`Spend: ${money(t.monthly)}/mo (${money(t.yearly)}/yr) across ${t.count} active subs · Health ${health.grade} (${health.score})`);
-  lines.push(`Saved so far: ${money(save.annualized)}/yr from ${save.count} cancellations`, ``);
+  lines.push(`Spend: ${money(t.monthly, base)}/mo (${money(t.yearly, base)}/yr) across ${t.count} active subs · Health ${health.grade} (${health.score})`);
+  lines.push(`Saved so far: ${money(save.annualized, base)}/yr from ${save.count} cancellations`, ``);
 
   if (upcoming.length) {
     lines.push(`Renewing in the next 14 days:`);
-    for (const s of upcoming) lines.push(`  • ${s.name} — ${money(s.amount ?? 0)} on ${s.nextDueAt!.toLocaleDateString()}`);
+    for (const s of upcoming) lines.push(`  • ${s.name} — ${money(s.amount ?? 0, base)} on ${s.nextDueAt!.toLocaleDateString()}`);
     lines.push(``);
   }
   if (anomalies.length) {
