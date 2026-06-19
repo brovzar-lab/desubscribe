@@ -1,0 +1,141 @@
+// Desubscribe data model — local SQLite.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// A connected mailbox. authType=imap uses an app-password; authType=gmail_oauth
+// uses Google OAuth tokens. Credentials/tokens stored encrypted.
+model EmailAccount {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  provider      String    @default("imap") // imap | gmail | outlook
+  authType      String    @default("imap") // imap | gmail_oauth
+  imapHost      String?
+  imapPort      Int       @default(993)
+  smtpHost      String?
+  smtpPort      Int       @default(465)
+  secretCipher  String? // AES-256-GCM encrypted app-password (IMAP)
+  oauthCipher   String? // AES-256-GCM encrypted {refresh_token, access_token, expiry}
+  lastSyncedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  charges       ChargeEvent[]
+}
+
+// A Plaid item = one financial institution login. Access token stored encrypted.
+model BankItem {
+  id            String    @id @default(cuid())
+  institution   String
+  tokenCipher   String // AES-256-GCM encrypted Plaid access_token
+  lastSyncedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  charges       ChargeEvent[]
+}
+
+// The unified, deduplicated thing-you-pay-for.
+model Subscription {
+  id           String        @id @default(cuid())
+  name         String
+  merchant     String? // normalized merchant key used for dedupe
+  category     String        @default("Other")
+  amount       Float? // per-cycle amount
+  currency     String        @default("USD")
+  cycle        String        @default("monthly") // weekly|monthly|quarterly|yearly|unknown
+  nextDueAt    DateTime?
+  firstSeenAt  DateTime?
+  lastChargeAt DateTime?
+  status       String        @default("active") // active|cancelling|cancelled|paused
+  source       String        @default("email") // email|bank|manual|merged
+  confidence   Float         @default(0.6) // 0..1
+  protected    Boolean       @default(false) // never auto-cancel when true
+  isTrial      Boolean       @default(false)
+  trialEndsAt  DateTime?
+  cancelUrl    String?
+  unsubData    String? // JSON: List-Unsubscribe info captured from email
+  notes        String?
+  tags         String? // comma-separated user tags
+  reviewNeeded Boolean       @default(false) // low-confidence: surface for review
+  previousAmount Float? // last known price before a change
+  priceChangedAt DateTime? // when we detected a price increase/decrease
+  cancelledAt  DateTime? // when it was cancelled (powers savings tracker)
+  lastReminderAt DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  charges      ChargeEvent[]
+  actions      ActionLog[]
+  sharedWith   Member[]      @relation("SubShares")
+}
+
+// A household member a subscription's cost can be split across. One member is
+// flagged isSelf = you.
+model Member {
+  id            String         @id @default(cuid())
+  name          String
+  email         String?
+  isSelf        Boolean        @default(false)
+  color         String?
+  createdAt     DateTime       @default(now())
+  subscriptions Subscription[] @relation("SubShares")
+}
+
+// A recorded, replayable cancellation macro for a specific merchant (captured
+// via `playwright codegen`). Replayed by the web-cancel engine when present.
+model CancelMacro {
+  id          String   @id @default(cuid())
+  merchantKey String   @unique
+  label       String?
+  steps       String // JSON array of {action,selector?,value?,url?}
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Evidence: an individual charge/receipt that backs a subscription.
+model ChargeEvent {
+  id             String        @id @default(cuid())
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  date           DateTime
+  amount         Float
+  currency       String        @default("USD")
+  source         String // email | plaid | manual
+  description    String?
+  emailAccountId String?
+  emailAccount   EmailAccount? @relation(fields: [emailAccountId], references: [id], onDelete: SetNull)
+  bankItemId     String?
+  bankItem       BankItem?     @relation(fields: [bankItemId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+}
+
+// Full audit trail of everything the AI did (full-auto safety).
+model ActionLog {
+  id             String        @id @default(cuid())
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  type           String // one_click | email_unsub | web_cancel | draft | sync
+  status         String // pending | success | failed | dry_run | skipped
+  detail         String? // human-readable summary
+  request        String? // JSON of what was attempted
+  response       String? // JSON / text of the result
+  screenshotPath String?
+  createdAt      DateTime      @default(now())
+}
+
+// Singleton-ish key/value settings (encrypted secrets + automation prefs).
+model Setting {
+  key   String @id
+  value String
+}
+
+// Learned merchant aliases: maps a normalized variant key -> canonical service
+// name. Built when you merge duplicates in the review inbox, so future syncs
+// dedupe correctly. This is the "training" memory.
+model MerchantAlias {
+  id        String   @id @default(cuid())
+  aliasKey  String   @unique // normalized merchantKey of the variant
+  canonical String // canonical display name to use
+  createdAt DateTime @default(now())
+}
