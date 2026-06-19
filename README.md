@@ -28,6 +28,8 @@ Then a **full-auto cancel engine** escalates through the cheapest reliable metho
 - **Full-auto cancel** per sub or in bulk (**cancel all unused / converting trials**), backed by **cancellation
   playbooks** for big services (Netflix, Spotify, Adobe, Disney+, Prime, NYT, Hulu, YouTube, Apple…).
 - **Reminders** — download a `.ics` of all renewals or push them to **Google Calendar**.
+- **Household & cost splitting** — split subscriptions across members; see per-person totals and your share.
+- **Cancel-macro recorder** — record a cancel once (`playwright codegen`); the engine replays it precisely.
 - **Multi-currency** — pick a base currency; totals normalize via live FX (daily-cached, offline fallback).
 - **Review inbox** — approve/reject/**merge** low-confidence detections; merging *teaches* the deduper.
 - **Paste / forward a receipt** — capture one subscription without scanning your whole inbox.

@@ -5,6 +5,7 @@ import { sendGmail } from "../email/gmail";
 import { oneClickUnsubscribe } from "../email/unsubscribe";
 import { researchCancellation } from "./research";
 import { webCancel } from "./webCancel";
+import { getMacroSteps } from "./macro";
 import type { UnsubInfo } from "../types";
 
 interface CancelResult {
@@ -71,14 +72,22 @@ export async function cancelSubscription(
     }
   }
 
-  // 3) Web cancel (paid services): research the page, then drive it -----------
+  // 3) Web cancel (paid services): replay a recorded macro if we have one,
+  //    otherwise research the page and best-effort drive it ------------------
+  const macro = await getMacroSteps(sub.name);
   const plan = await researchCancellation(sub.name);
   const cancelUrl = sub.cancelUrl || plan.cancelUrl;
-  if (cancelUrl) {
+  if (cancelUrl || macro) {
     if (dryRun) {
-      steps.push({ type: "web_cancel", status: "dry_run", detail: `Would open ${cancelUrl} and follow: ${plan.steps.join(" → ")}` });
+      steps.push({
+        type: "web_cancel",
+        status: "dry_run",
+        detail: macro
+          ? `Would replay recorded macro (${macro.length} steps) for ${sub.name}`
+          : `Would open ${cancelUrl} and follow: ${plan.steps.join(" → ")}`,
+      });
     } else {
-      const r = await webCancel(cancelUrl, sub.name);
+      const r = await webCancel(cancelUrl || "", sub.name, macro);
       await log(sub.id, "web_cancel", r.ok ? "success" : "failed", r.detail, { cancelUrl, plan }, r, r.screenshotPath);
       steps.push({ type: "web_cancel", status: r.ok ? "success" : "failed", detail: r.detail });
     }

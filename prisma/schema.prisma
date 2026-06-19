@@ -67,6 +67,30 @@ model Subscription {
   updatedAt    DateTime      @updatedAt
   charges      ChargeEvent[]
   actions      ActionLog[]
+  sharedWith   Member[]      @relation("SubShares")
+}
+
+// A household member a subscription's cost can be split across. One member is
+// flagged isSelf = you.
+model Member {
+  id            String         @id @default(cuid())
+  name          String
+  email         String?
+  isSelf        Boolean        @default(false)
+  color         String?
+  createdAt     DateTime       @default(now())
+  subscriptions Subscription[] @relation("SubShares")
+}
+
+// A recorded, replayable cancellation macro for a specific merchant (captured
+// via `playwright codegen`). Replayed by the web-cancel engine when present.
+model CancelMacro {
+  id          String   @id @default(cuid())
+  merchantKey String   @unique
+  label       String?
+  steps       String // JSON array of {action,selector?,value?,url?}
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // Evidence: an individual charge/receipt that backs a subscription.

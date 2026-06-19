@@ -1,13 +1,15 @@
 import path from "node:path";
 import fs from "node:fs/promises";
+import { runMacro, type MacroStep } from "./macro";
 
 // Drive a cancel page with Playwright. Playwright is an OPTIONAL dependency and
 // a heavy browser download, so we import it dynamically and degrade gracefully.
-// Cancel flows differ per merchant and change often; this is best-effort and
-// every step is screenshotted for the audit log.
+// If a recorded macro is supplied we replay it precisely; otherwise we fall back
+// to best-effort heuristic clicking. Every run is screenshotted for the audit log.
 export async function webCancel(
   cancelUrl: string,
   serviceName: string,
+  macroSteps?: MacroStep[] | null,
 ): Promise<{ ok: boolean; detail: string; screenshotPath: string | null }> {
   // Playwright is an optional, heavy peer dep that may not be installed.
   // Keep it untyped + opaque to the bundler so builds work without it.
@@ -31,6 +33,19 @@ export async function webCancel(
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
+
+    // Recorded macro path — replay precise steps.
+    if (macroSteps && macroSteps.length) {
+      const log = await runMacro(page, macroSteps);
+      await page.screenshot({ path: shot, fullPage: true }).catch(() => {});
+      const failed = log.some((l) => l.startsWith("FAILED"));
+      return {
+        ok: !failed,
+        detail: `Replayed recorded macro (${macroSteps.length} steps): ${log.join(" → ")}`,
+        screenshotPath: shot,
+      };
+    }
+
     await page.goto(cancelUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
     // Best-effort: click an obvious cancel control if present.
     const candidates = [

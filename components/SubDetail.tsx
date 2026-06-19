@@ -28,10 +28,25 @@ export default function SubDetail({ sub, charges, actions }: { sub: Sub; charges
     const p = data.plan;
     setPlan(
       p
-        ? `Method: ${p.method} · Source: ${p.source}\n${p.cancelUrl ? "URL: " + p.cancelUrl + "\n" : ""}${p.phone ? "Phone: " + p.phone + "\n" : ""}Steps:\n- ${p.steps.join("\n- ")}${p.retentionTip ? "\n\n💡 " + p.retentionTip : ""}`
+        ? `Method: ${p.method} · Source: ${p.source}${data.hasMacro ? ` · 🤖 recorded macro (${data.macroSteps} steps)` : ""}\n${p.cancelUrl ? "URL: " + p.cancelUrl + "\n" : ""}${p.phone ? "Phone: " + p.phone + "\n" : ""}Steps:\n- ${p.steps.join("\n- ")}${p.retentionTip ? "\n\n💡 " + p.retentionTip : ""}\n\n${data.blockGuidance}`
         : "No plan.",
     );
     setBusy(false);
+  }
+
+  async function saveMacro() {
+    const raw = prompt(
+      `Paste cancel-macro steps as JSON for ${sub.name}.\nGenerate with: npx playwright codegen <cancel-url>\nExample:\n[{"action":"goto","url":"https://..."},{"action":"click","selector":"text=Cancel"}]`,
+    );
+    if (!raw) return;
+    let steps: unknown;
+    try { steps = JSON.parse(raw); } catch { setToast("Not valid JSON"); return; }
+    setBusy(true);
+    const res = await fetch("/api/macros", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ merchant: sub.name, steps }) });
+    const data = await res.json();
+    setToast(data.message || "Saved");
+    setBusy(false);
+    setTimeout(() => setToast(null), 6000);
   }
 
   async function loadRetention() {
@@ -81,6 +96,7 @@ export default function SubDetail({ sub, charges, actions }: { sub: Sub; charges
 
         <div className="mt-4 flex flex-wrap gap-2">
           <button className="btn-ghost" onClick={loadPlan} disabled={busy}>Preview cancel plan</button>
+          <button className="btn-ghost" onClick={saveMacro} disabled={busy}>🤖 Record cancel macro</button>
           <button className="btn-ghost" onClick={loadRetention} disabled={busy}>💰 Draft retention offer</button>
           <button className="btn-ghost" onClick={() => action(`/api/subscriptions/${sub.id}/retention`, {})} disabled={busy}>Save retention draft to mailbox</button>
           <button className="btn-ghost" onClick={() => action(`/api/subscriptions/${sub.id}`, { protected: !sub.protected })} disabled={busy}>

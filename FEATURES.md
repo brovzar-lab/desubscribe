@@ -54,10 +54,20 @@ engineered fixes + new features. This is the running record.
 - **Email-forward / paste capture** — `POST /api/ingest/email` (raw RFC822 or `{from,subject,text}`) extracts one
   receipt without a full inbox scan; "Paste receipt" box on the dashboard.
 
+## ✅ Roadmap wave 3 — now shipped
+
+- **Household & cost splitting** (`/household`) — add members, split any subscription across them, see
+  per-member monthly totals and **your share** (currency-normalized). `lib/household.ts`, `Member` model +
+  `Subscription.sharedWith` m2m, `/api/members`, `/api/subscriptions/[id]/share`.
+- **Cancel-macro recorder/replayer** — record a cancel once with `npx playwright codegen`, save the steps
+  (`/api/macros`), and the web-cancel engine **replays them precisely** instead of heuristic clicking.
+  `CancelMacro` model, `lib/cancel/macro.ts`, button on the detail page.
+- **Virtual-card / block-merchant guidance** — when a service stonewalls, the plan preview shows how to cut the
+  charges off (virtual card, stop-payment, dispute). `lib/cancel/blockGuidance.ts`.
+
 ## 🚧 Engineer's roadmap — still ahead
 
-1. **Virtual-card / block-merchant guidance** when a service won't let you cancel online.
-2. **Shared/household subscriptions** — split cost, per-member ownership.
-3. **Encryption-key in OS keychain** instead of `.env`; per-user auth for multi-user/hosted mode.
-4. **Playwright cancel-flow recorder** — record a cancel once, replay it as a per-merchant macro.
-5. **Inbound email webhook** (e.g. forwarding address) to auto-capture receipts in real time.
+1. **Encryption-key in OS keychain** instead of `.env`; per-user auth for multi-user/hosted mode.
+2. **Inbound email webhook** (a forwarding address) to auto-capture receipts in real time.
+3. **In-app cancel-macro recorder** (launch a headed browser, capture clicks) so you don't need the CLI.
+4. **Spending forecasts** — project next 12 months incl. known annual renewals.
