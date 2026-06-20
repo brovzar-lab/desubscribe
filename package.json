@@ -23,6 +23,7 @@
     "date-fns": "^4.1.0",
     "googleapis": "^173.0.0",
     "imapflow": "^1.0.218",
+    "lucide-react": "^1.21.0",
     "mailparser": "^3.7.4",
     "next": "^15.5.4",
     "nodemailer": "^7.0.10",

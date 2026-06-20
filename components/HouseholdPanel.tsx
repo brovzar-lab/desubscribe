@@ -42,6 +42,8 @@ export default function HouseholdPanel(props: Props) {
 
   return (
     <div className="space-y-6">
+      <h1 className="font-display text-3xl font-semibold text-ink">Household</h1>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Stat label="Household total / mo" value={fmt(props.totalActive)} />
         <Stat label="Your share / mo" value={fmt(props.yourShare)} accent />
@@ -50,43 +52,48 @@ export default function HouseholdPanel(props: Props) {
 
       {/* Members */}
       <div className="card space-y-3">
-        <h2 className="font-semibold">Members</h2>
+        <h2 className="text-base font-semibold text-ink">Members</h2>
         <div className="flex flex-wrap gap-2">
           {props.perMember.map((m) => (
-            <div key={m.id} className="flex items-center gap-2 rounded-xl border border-edge px-3 py-2 text-sm">
-              <span className="font-medium">{m.name}{m.isSelf && " (you)"}</span>
-              <span className="text-muted">{fmt(m.monthly)}/mo</span>
-              <button className="text-muted hover:text-bad" disabled={busy} onClick={() => call(`/api/members/${m.id}`, "DELETE")}>✕</button>
+            <div key={m.id} className="card flex items-center gap-2 border border-line bg-surface px-3 py-2 text-sm">
+              <span className="font-semibold text-ink">{m.name}{m.isSelf && " (you)"}</span>
+              <span className="num text-ink-2">{fmt(m.monthly)}/mo</span>
+              <button className="text-ink-3 hover:text-error" disabled={busy} onClick={() => call(`/api/members/${m.id}`, "DELETE")}>✕</button>
             </div>
           ))}
-          {props.members.length === 0 && <p className="text-sm text-muted">Add yourself + housemates/family, then assign subscriptions below.</p>}
+          {props.members.length === 0 && <p className="text-sm text-ink-3">Add yourself + housemates/family, then assign subscriptions below.</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <input className="input" placeholder="Member name" value={name} onChange={(e) => setName(e.target.value)} />
-          <button className="btn-primary" disabled={!name || busy} onClick={() => { call("/api/members", "POST", { name, isSelf: props.members.length === 0 }); setName(""); }}>
+          <button className="btn btn-primary" disabled={!name || busy} onClick={() => { call("/api/members", "POST", { name, isSelf: props.members.length === 0 }); setName(""); }}>
             Add member
           </button>
-          <span className="text-xs text-muted">First member added is marked “you”.</span>
+          <span className="text-xs text-ink-3">First member added is marked "you".</span>
         </div>
       </div>
 
       {/* Assignment grid */}
       <div className="card overflow-x-auto">
-        <h2 className="mb-3 font-semibold">Split each subscription</h2>
+        <h2 className="mb-3 text-base font-semibold text-ink">Split each subscription</h2>
         {props.members.length === 0 ? (
-          <p className="text-sm text-muted">Add members first.</p>
+          <p className="text-sm text-ink-3">Add members first.</p>
         ) : (
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-muted">
-              <tr><th className="py-2">Subscription</th><th>Cost/mo</th><th>Split between (click to toggle)</th><th>Per person</th></tr>
+            <thead>
+              <tr className="text-left">
+                <th className="stat-label py-2">Subscription</th>
+                <th className="stat-label">Cost/mo</th>
+                <th className="stat-label">Split between (click to toggle)</th>
+                <th className="stat-label">Per person</th>
+              </tr>
             </thead>
             <tbody>
               {props.subs.map((s) => {
                 const n = s.memberIds.length || 1;
                 return (
-                  <tr key={s.id} className="border-t border-edge/60">
-                    <td className="py-2 font-medium">{s.name}</td>
-                    <td>{fmt(s.baseMonthly)}</td>
+                  <tr key={s.id} className="border-t border-line">
+                    <td className="py-2 font-semibold text-ink">{s.name}</td>
+                    <td className="num text-ink">{fmt(s.baseMonthly)}</td>
                     <td>
                       <div className="flex flex-wrap gap-1">
                         {props.members.map((m) => {
@@ -96,8 +103,7 @@ export default function HouseholdPanel(props: Props) {
                               key={m.id}
                               disabled={busy}
                               onClick={() => toggleMember(s, m.id)}
-                              className={`pill border ${on ? "text-white" : "text-muted"} `}
-                              style={{ borderColor: m.color ?? "#1e2842", background: on ? (m.color ?? "#6d8bff") + "33" : "transparent" }}
+                              className={`pill ${on ? "bg-accent-soft text-on-soft" : "bg-sunken text-ink-3"}`}
                             >
                               {m.name}{m.isSelf ? " (you)" : ""}
                             </button>
@@ -105,7 +111,7 @@ export default function HouseholdPanel(props: Props) {
                         })}
                       </div>
                     </td>
-                    <td className="text-muted">{s.memberIds.length ? fmt(s.baseMonthly / n) : "—"}</td>
+                    <td className="num text-ink-2">{s.memberIds.length ? fmt(s.baseMonthly / n) : "—"}</td>
                   </tr>
                 );
               })}
@@ -114,16 +120,16 @@ export default function HouseholdPanel(props: Props) {
         )}
       </div>
 
-      {toast && <div className="fixed bottom-5 left-1/2 -translate-x-1/2 rounded-lg border border-edge bg-panel px-4 py-2 text-sm shadow-lg">{toast}</div>}
+      {toast && <div className="fixed bottom-5 left-1/2 -translate-x-1/2 rounded-lg border border-line bg-surface px-4 py-2 text-sm text-ink shadow-lg">{toast}</div>}
     </div>
   );
 }
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="card">
-      <div className="text-xs uppercase text-muted">{label}</div>
-      <div className={`mt-1 text-2xl font-bold ${accent ? "text-brand" : ""}`}>{value}</div>
+    <div className="stat-tile">
+      <div className="stat-label">{label}</div>
+      <div className={`stat-value font-sans num ${accent ? "text-accent" : "text-ink"}`}>{value}</div>
     </div>
   );
 }

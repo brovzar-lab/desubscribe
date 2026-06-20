@@ -14,6 +14,24 @@ interface Sub {
 interface Charge { date: string; amount: number; source: string; description: string | null }
 interface Action { type: string; status: string; detail: string | null; createdAt: string }
 
+/* deterministic colour from name */
+const AVATAR_COLORS = [
+  "bg-accent", "bg-data-blue", "bg-success", "bg-warning", "bg-error",
+  "bg-data-violet", "bg-data-teal", "bg-data-coral", "bg-accent-soft", "bg-data-blue",
+];
+function avatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
+function dotColor(status: string) {
+  if (status === "success") return "bg-success";
+  if (status === "failed") return "bg-error";
+  if (status === "dry_run") return "bg-accent";
+  return "bg-warning";
+}
+
 export default function SubDetail({ sub, charges, actions }: { sub: Sub; charges: Charge[]; actions: Action[] }) {
   const router = useRouter();
   const [plan, setPlan] = useState<string | null>(null);
@@ -71,80 +89,176 @@ export default function SubDetail({ sub, charges, actions }: { sub: Sub; charges
   const priceDelta = sub.previousAmount != null && sub.amount != null ? sub.amount - sub.previousAmount : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-stagger">
+      {/* ── Hero Card ──────────────────────────────────────────────── */}
       <div className="card">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold">
-              {sub.name} {sub.isTrial && <span className="pill bg-bad/20 text-bad">trial</span>}
-              {sub.knownPlaybook && <span className="pill bg-good/20 text-good ml-1">playbook</span>}
-            </h1>
-            <p className="text-sm text-muted">{sub.category} · {sub.source} · {Math.round(sub.confidence * 100)}% confidence</p>
+        <div className="flex items-start gap-4">
+          {/* Large avatar initial */}
+          <div
+            className={`avatar-initial ${avatarColor(sub.name)} text-white`}
+            style={{ width: 56, height: 56, fontSize: "1.25rem", borderRadius: "1rem" }}
+          >
+            {sub.name.charAt(0).toUpperCase()}
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold">{fmtMoney(sub.amount)}</div>
-            <div className="text-sm text-muted">{fmtMoney(sub.monthly)}/mo · next {dueLabel(sub.nextDueAt)}</div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-display text-3xl font-semibold text-ink truncate">{sub.name}</h1>
+              {sub.isTrial && <span className="pill bg-data-coral-soft text-on-data-coral">trial</span>}
+              {sub.knownPlaybook && <span className="pill bg-success-soft text-on-success">playbook</span>}
+            </div>
+            <p className="mt-0.5 text-sm text-ink-2">
+              {sub.category} · {sub.source} · {Math.round(sub.confidence * 100)}% confidence
+            </p>
           </div>
         </div>
 
+        {/* ── Stats row ────────────────────────────────────────────── */}
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="stat-tile text-center">
+            <div className="stat-label">Amount</div>
+            <div className="stat-value font-sans text-2xl text-ink">{fmtMoney(sub.amount)}</div>
+          </div>
+          <div className="stat-tile text-center">
+            <div className="stat-label">Cycle</div>
+            <div className="stat-value font-sans text-2xl text-ink">{sub.cycle}</div>
+          </div>
+          <div className="stat-tile text-center">
+            <div className="stat-label">Next due</div>
+            <div className="stat-value font-sans text-2xl text-ink">{dueLabel(sub.nextDueAt)}</div>
+          </div>
+          <div className="stat-tile text-center">
+            <div className="stat-label">Source</div>
+            <div className="stat-value font-sans text-2xl text-ink capitalize">{sub.source}</div>
+          </div>
+        </div>
+
+        {/* ── Price change alert ────────────────────────────────────── */}
         {priceDelta != null && Math.abs(priceDelta) > 0.01 && (
-          <div className={`mt-3 rounded-lg border px-3 py-2 text-sm ${priceDelta > 0 ? "border-bad/40 bg-bad/10 text-bad" : "border-good/40 bg-good/10 text-good"}`}>
+          <div
+            className={`mt-4 rounded-lg border-l-4 px-4 py-3 text-sm ${
+              priceDelta > 0 ? "border-error bg-error-soft text-on-error" : "border-success bg-success-soft text-on-success"
+            }`}
+          >
             Price {priceDelta > 0 ? "increased" : "decreased"} {fmtMoney(Math.abs(priceDelta))} (was {fmtMoney(sub.previousAmount)})
             {sub.priceChangedAt && ` on ${new Date(sub.priceChangedAt).toLocaleDateString()}`}
           </div>
         )}
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        {/* ── Action buttons ───────────────────────────────────────── */}
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            className="btn-danger"
+            onClick={() => action("/api/cancel", { id: sub.id })}
+            disabled={busy || sub.protected || sub.status !== "active"}
+          >
+            Cancel now
+          </button>
+          <button
+            className="btn-primary"
+            onClick={() => action("/api/cancel", { id: sub.id, dryRun: true })}
+            disabled={busy}
+          >
+            Dry-run cancel
+          </button>
           <button className="btn-ghost" onClick={loadPlan} disabled={busy}>Preview cancel plan</button>
           <button className="btn-ghost" onClick={saveMacro} disabled={busy}>🤖 Record cancel macro</button>
           <button className="btn-ghost" onClick={loadRetention} disabled={busy}>💰 Draft retention offer</button>
-          <button className="btn-ghost" onClick={() => action(`/api/subscriptions/${sub.id}/retention`, {})} disabled={busy}>Save retention draft to mailbox</button>
-          <button className="btn-ghost" onClick={() => action(`/api/subscriptions/${sub.id}`, { protected: !sub.protected })} disabled={busy}>
+          <button
+            className="btn-ghost"
+            onClick={() => action(`/api/subscriptions/${sub.id}/retention`, {})}
+            disabled={busy}
+          >
+            Save retention draft to mailbox
+          </button>
+          <button
+            className="btn-ghost"
+            onClick={() => action(`/api/subscriptions/${sub.id}`, { protected: !sub.protected })}
+            disabled={busy}
+          >
             {sub.protected ? "🔒 Protected" : "🔓 Protect"}
           </button>
-          <button className="btn-ghost" onClick={() => action("/api/cancel", { id: sub.id, dryRun: true })} disabled={busy}>Dry-run cancel</button>
-          <button className="btn-danger" onClick={() => action("/api/cancel", { id: sub.id })} disabled={busy || sub.protected || sub.status !== "active"}>Cancel now</button>
         </div>
-        {plan && <pre className="mt-3 whitespace-pre-wrap rounded-lg border border-edge bg-ink p-3 text-xs text-muted">{plan}</pre>}
-        {retention && <pre className="mt-3 whitespace-pre-wrap rounded-lg border border-good/40 bg-good/5 p-3 text-xs text-muted">{retention}</pre>}
+
+        {/* ── Cancel plan preview ──────────────────────────────────── */}
+        {plan && (
+          <pre className="mt-4 whitespace-pre-wrap rounded-lg border border-line bg-sunken p-4 text-xs text-ink-2 leading-relaxed">
+            {plan}
+          </pre>
+        )}
+
+        {/* ── Retention draft ──────────────────────────────────────── */}
+        {retention && (
+          <pre className="mt-4 whitespace-pre-wrap rounded-lg border border-success/20 bg-sunken p-4 text-xs text-ink-2 leading-relaxed">
+            {retention}
+          </pre>
+        )}
       </div>
 
+      {/* ── History panels ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Charge history */}
         <div className="card">
-          <h2 className="mb-3 font-semibold">Charge history ({charges.length})</h2>
+          <h2 className="stat-label mb-4">
+            💳 Charge history <span className="text-ink">({charges.length})</span>
+          </h2>
           {charges.length === 0 ? (
-            <p className="text-sm text-muted">No charges recorded yet.</p>
+            <p className="text-sm text-ink-3">No charges recorded yet.</p>
           ) : (
-            <ul className="space-y-1 text-sm">
+            <div className="relative ml-3 border-l-2 border-line pl-5 space-y-4">
               {charges.map((c, i) => (
-                <li key={i} className="flex justify-between border-b border-edge/40 py-1">
-                  <span className="text-muted">{new Date(c.date).toLocaleDateString()} · {c.source}</span>
-                  <span>{fmtMoney(c.amount)}</span>
-                </li>
+                <div key={i} className="relative">
+                  {/* dot */}
+                  <span className="absolute -left-[1.625rem] top-1 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-surface" />
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-medium text-ink num">{fmtMoney(c.amount)}</span>
+                    <span className="text-xs text-ink-3 whitespace-nowrap">
+                      {new Date(c.date).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-ink-3 mt-0.5">{c.source}{c.description ? ` · ${c.description}` : ""}</p>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </div>
+
+        {/* Action history */}
         <div className="card">
-          <h2 className="mb-3 font-semibold">Action history ({actions.length})</h2>
+          <h2 className="stat-label mb-4">
+            ⚡ Action history <span className="text-ink">({actions.length})</span>
+          </h2>
           {actions.length === 0 ? (
-            <p className="text-sm text-muted">Nothing yet.</p>
+            <p className="text-sm text-ink-3">Nothing yet.</p>
           ) : (
-            <ul className="space-y-1 text-sm">
+            <div className="relative ml-3 border-l-2 border-line pl-5 space-y-4">
               {actions.map((a, i) => (
-                <li key={i} className="border-b border-edge/40 py-1">
-                  <span className="pill bg-edge text-muted mr-2">{a.type}</span>
-                  <span className={a.status === "success" ? "text-good" : a.status === "failed" ? "text-bad" : "text-muted"}>{a.status}</span>
-                  <span className="text-muted"> · {new Date(a.createdAt).toLocaleString()}</span>
-                  {a.detail && <div className="text-xs text-muted">{a.detail}</div>}
-                </li>
+                <div key={i} className="relative">
+                  {/* status dot */}
+                  <span className={`absolute -left-[1.625rem] top-1 h-2.5 w-2.5 rounded-full ring-2 ring-surface ${dotColor(a.status)}`} />
+                  <div className="flex items-center gap-2">
+                    <span className="pill bg-sunken text-ink-3">{a.type}</span>
+                    <span className={`text-sm font-medium ${
+                      a.status === "success" ? "text-success" : a.status === "failed" ? "text-error" : "text-ink-3"
+                    }`}>
+                      {a.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-ink-3 mt-0.5">{new Date(a.createdAt).toLocaleString()}</p>
+                  {a.detail && <p className="text-xs text-ink-3/70 mt-0.5">{a.detail}</p>}
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </div>
       </div>
 
-      {toast && <div className="fixed bottom-5 left-1/2 -translate-x-1/2 rounded-lg border border-edge bg-panel px-4 py-2 text-sm shadow-lg">{toast}</div>}
+      {/* ── Toast ──────────────────────────────────────────────────── */}
+      {toast && (
+        <div className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 bg-accent rounded-lg px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-accent/20">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
