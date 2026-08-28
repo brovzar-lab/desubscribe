@@ -3,6 +3,10 @@
 Find **everything you're paying for** across your inboxes and bank/cards, see **how much** and
 **when it's due**, and let AI **unsubscribe / cancel** — full-auto, with an audit trail.
 
+## Main page
+
+![App main page](docs/main-page.png)
+
 It fuses every signal into one deduplicated list:
 
 - **Gmail via Google OAuth** — one-click connect; reads receipts, sends cancellations, drives Calendar reminders.
